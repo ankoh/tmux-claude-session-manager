@@ -59,12 +59,14 @@ sel=$(emit_rows | fzf --ansi --delimiter='\t' --with-nth=3,4,5 \
 [ -z "$sel" ] && exit 0
 target=$(printf '%s' "$sel" | cut -f2)
 
-# Move the underlying parent client to the session's origin window (best-effort),
-# then resume the session in THIS popup over it. Falls back to resuming over the
-# current window when origin/parent are unknown.
-origin=$(tmux show-options -qv -t "$target" @claude_origin 2>/dev/null)
+# Jump to the selected session by switching the OUTER client — the one hosting
+# this popup, recorded in @claude_parent by list.sh — directly to it, then exit.
+# The -E popup closes on exit, so you land in the chosen session full-screen
+# instead of having it attached inside the (now closed) popup. Falls back to the
+# popup's own client when the parent is unknown.
 parent=$(tmux show-options -gqv @claude_parent 2>/dev/null)
-[ -n "$origin" ] && [ -n "$parent" ] &&
-  tmux switch-client -c "$parent" -t "$origin" 2>/dev/null
-
-tmux attach-session -t "$target"
+if [ -n "$parent" ]; then
+  tmux switch-client -c "$parent" -t "$target" 2>/dev/null
+else
+  tmux switch-client -t "$target" 2>/dev/null
+fi
