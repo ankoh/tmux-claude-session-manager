@@ -14,8 +14,14 @@ prefix="$(get_tmux_option @claude_session_prefix 'claude-')"
 emit_rows() {
   local now s state at path icon rank ago
   now=$(date +%s)
-  tmux list-sessions -F '#{session_name}' 2>/dev/null | grep "^${prefix}" | while IFS= read -r s; do
+  # A session belongs in the picker if EITHER it carries the launcher's prefix
+  # (sessions this plugin created) OR the hooks have stamped it with a Claude
+  # state. The latter catches Claude running in your own manually-named sessions
+  # (dotfiles, hyper-ai, …), which never match the prefix. Prefix-only sessions
+  # with no hook yet still list as "?" — preserving the no-hooks behavior.
+  tmux list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r s; do
     state=$(tmux show-options -qv -t "$s" @claude_state 2>/dev/null)
+    case "$s" in "$prefix"*) ;; *) [ -z "$state" ] && continue ;; esac
     at=$(tmux show-options -qv -t "$s" @claude_state_at 2>/dev/null)
     path=$(tmux display-message -p -t "$s" '#{pane_current_path}' 2>/dev/null)
     case "$state" in
